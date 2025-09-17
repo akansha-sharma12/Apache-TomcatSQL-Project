@@ -13,12 +13,12 @@ This project demonstrates a complete multi-tier web application stack deployed u
 6. Build Tool: Apache Maven
 
 **Architecture:**
-Web Tier: Nginx reverse proxy routing traffic to Tomcat
-Application Tier: Java web application (vProfile) running on Tomcat
-Database Tier: MariaDB with pre-loaded application data
-Caching Layer: Memcached for performance optimization
-Message Broker: RabbitMQ for asynchronous communication
-Opensearch : Indexing/Search service
+1. Web Tier: Nginx reverse proxy routing traffic to Tomcat
+2. Application Tier: Java web application (vProfile) running on Tomcat
+3. Database Tier: MariaDB with pre-loaded application data
+4. Caching Layer: Memcached for performance optimization
+5. Message Broker: RabbitMQ for asynchronous communication
+6. Opensearch : Indexing/Search service
 
 **Deployment Approaches:**
 **Automated Deployment:**
