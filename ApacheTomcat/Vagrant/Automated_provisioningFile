@@ -1,0 +1,279 @@
+#!/bin/bash
+DATABASE_PASS='admin123'
+
+# MEmcache
+yum install epel-release -y
+yum install memcached -y
+systemctl start memcached
+systemctl enable memcached
+systemctl status memcached
+memcached -p 11211 -U 11111 -u memcached -d
+
+# Rabbit
+yum install socat -y
+yum install erlang -y
+yum install wget -y
+wget https://www.rabbitmq.com/releases/rabbitmq-server/v3.6.10/rabbitmq-server-3.6.10-1.el7.noarch.rpm
+rpm --import https://www.rabbitmq.com/rabbitmq-release-signing-key.asc
+yum update
+rpm -Uvh rabbitmq-server-3.6.10-1.el7.noarch.rpm
+systemctl start rabbitmq-server
+systemctl enable rabbitmq-server
+systemctl status rabbitmq-server
+echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+rabbitmqctl add_user rabbit bunny
+rabbitmqctl set_user_tags rabbit administrator
+systemctl restart rabbitmq-server
+
+# Mysql
+yum install mariadb-server -y
+
+#mysql_secure_installation
+sed -i 's/^127.0.0.1/0.0.0.0/' /etc/my.cnf
+
+# starting & enabling mariadb-server
+systemctl start mariadb
+systemctl enable mariadb
+
+#restore the dump file for the application
+mysqladmin -u root password "$DATABASE_PASS"
+mysql -u root -p"$DATABASE_PASS" -e "UPDATE mysql.user SET Password=PASSWORD('$DATABASE_PASS') WHERE User='root'"
+mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User=''"
+mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
+mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+mysql -u root -p"$DATABASE_PASS" -e "create database accounts"
+mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'localhost' identified by 'admin123'"
+mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'app01' identified by 'admin123'"
+mysql -u root -p"$DATABASE_PASS" accounts < /vagrant/vprofile-repo/src/main/resources/db_backup.sql
+mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+
+# Restart mariadb-server
+systemctl restart mariadb
+#!/bin/bash
+sudo dnf install epel-release -y
+sudo dnf install memcached -y
+sudo systemctl start memcached
+sudo systemctl enable memcached
+sudo systemctl status memcached
+sed -i 's/127.0.0.1/0.0.0.0/g' /etc/sysconfig/memcached
+sudo systemctl restart memcached
+firewall-cmd --add-port=11211/tcp
+firewall-cmd --runtime-to-permanent
+firewall-cmd --add-port=11111/udp
+firewall-cmd --runtime-to-permanent
+sudo memcached -p 11211 -U 11111 -u memcached -d
+
+#!/bin/bash
+DATABASE_PASS='admin123'
+sudo yum update -y
+sudo yum install epel-release -y
+sudo yum install git zip unzip -y
+sudo yum install mariadb-server -y
+
+
+# starting & enabling mariadb-server
+sudo systemctl start mariadb
+sudo systemctl enable mariadb
+cd /tmp/
+git clone -b main https://github.com/hkhcoder/vprofile-project.git
+#restore the dump file for the application
+sudo mysqladmin -u root password "$DATABASE_PASS"
+sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User=''"
+sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
+sudo mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+sudo mysql -u root -p"$DATABASE_PASS" -e "create database accounts"
+sudo mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'localhost' identified by 'admin123'"
+sudo mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'%' identified by 'admin123'"
+sudo mysql -u root -p"$DATABASE_PASS" accounts < /tmp/vprofile-project/src/main/resources/db_backup.sql
+sudo mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+
+# Restart mariadb-server
+sudo systemctl restart mariadb
+
+
+#starting the firewall and allowing the mariadb to access from port no. 3306
+sudo systemctl start firewalld
+sudo systemctl enable firewalld
+sudo firewall-cmd --get-active-zones
+sudo firewall-cmd --zone=public --add-port=3306/tcp --permanent
+sudo firewall-cmd --reload
+sudo systemctl restart mariadb
+
+# adding repository and installing nginx		
+apt update
+apt install nginx -y
+cat <<EOT > vproapp
+upstream vproapp {
+
+ server app01:8080;
+
+}
+
+server {
+
+  listen 80;
+
+location / {
+
+  proxy_pass http://vproapp;
+
+}
+
+}
+
+EOT
+
+mv vproapp /etc/nginx/sites-available/vproapp
+rm -rf /etc/nginx/sites-enabled/default
+ln -s /etc/nginx/sites-available/vproapp /etc/nginx/sites-enabled/vproapp
+
+#starting nginx service and firewall
+systemctl start nginx
+systemctl enable nginx
+systemctl restart nginx
+
+#!/bin/bash
+sudo yum install epel-release -y
+sudo yum update -y
+sudo yum install wget -y
+cd /tmp/
+dnf -y install centos-release-rabbitmq-38
+ dnf --enablerepo=centos-rabbitmq-38 -y install rabbitmq-server
+ systemctl enable --now rabbitmq-server
+ firewall-cmd --add-port=5672/tcp
+ firewall-cmd --runtime-to-permanent
+sudo systemctl start rabbitmq-server
+sudo systemctl enable rabbitmq-server
+sudo systemctl status rabbitmq-server
+sudo sh -c 'echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config'
+sudo rabbitmqctl add_user test test
+sudo rabbitmqctl set_user_tags test administrator
+rabbitmqctl set_permissions -p / test ".*" ".*" ".*"
+sudo systemctl restart rabbitmq-server
+
+#!/bin/bash
+sudo apt update
+sudo apt upgrade -y
+sudo apt install openjdk-8-jdk -y
+sudo apt install tomcat8 tomcat8-admin tomcat8-docs tomcat8-common git -y
+
+#!/bin/bash
+TOMURL="https://archive.apache.org/dist/tomcat/tomcat-10/v10.1.26/bin/apache-tomcat-10.1.26.tar.gz"
+dnf -y install java-17-openjdk java-17-openjdk-devel
+dnf install git wget rsync unzip zip -y
+cd /tmp/
+wget $TOMURL -O tomcatbin.tar.gz
+EXTOUT=`tar xzvf tomcatbin.tar.gz`
+TOMDIR=`echo $EXTOUT | cut -d '/' -f1`
+useradd --shell /sbin/nologin tomcat
+rsync -avzh /tmp/$TOMDIR/ /usr/local/tomcat/
+chown -R tomcat.tomcat /usr/local/tomcat
+
+rm -rf /etc/systemd/system/tomcat.service
+
+cat <<EOT>> /etc/systemd/system/tomcat.service
+[Unit]
+Description=Tomcat
+After=network.target
+
+[Service]
+
+User=tomcat
+Group=tomcat
+
+WorkingDirectory=/usr/local/tomcat
+
+#Environment=JRE_HOME=/usr/lib/jvm/jre
+Environment=JAVA_HOME=/usr/lib/jvm/jre
+
+Environment=CATALINA_PID=/var/tomcat/%i/run/tomcat.pid
+Environment=CATALINA_HOME=/usr/local/tomcat
+Environment=CATALINE_BASE=/usr/local/tomcat
+
+ExecStart=/usr/local/tomcat/bin/catalina.sh run
+ExecStop=/usr/local/tomcat/bin/shutdown.sh
+
+
+RestartSec=10
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+EOT
+
+systemctl daemon-reload
+systemctl start tomcat
+systemctl enable tomcat
+cd /tmp/
+wget https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.zip
+unzip apache-maven-3.9.9-bin.zip
+cp -r apache-maven-3.9.9 /usr/local/maven3.9
+export MAVEN_OPTS="-Xmx512m"
+
+git clone -b local https://github.com/hkhcoder/vprofile-project.git
+cd vprofile-project
+/usr/local/maven3.9/bin/mvn install
+systemctl stop tomcat
+sleep 20
+rm -rf /usr/local/tomcat/webapps/ROOT*
+cp target/vprofile-v2.war /usr/local/tomcat/webapps/ROOT.war
+systemctl start tomcat
+sleep 20
+systemctl stop firewalld
+systemctl disable firewalld
+#cp /vagrant/application.properties /usr/local/tomcat/webapps/ROOT/WEB-INF/classes/application.properties
+systemctl restart tomcat
+
+Vagrant.configure("2") do |config|
+  config.hostmanager.enabled = true 
+  config.hostmanager.manage_host = true
+  
+### DB vm  ####
+  config.vm.define "db01" do |db01|
+    db01.vm.box = "bandit145/centos_stream9_arm"
+    db01.vm.hostname = "db01"
+    db01.vm.network "private_network", ip: "192.168.56.25"
+    db01.vm.provision "shell", path: "mysql.sh"  
+
+  end
+  
+### Memcache vm  #### 
+  config.vm.define "mc01" do |mc01|
+    mc01.vm.box = "bandit145/centos_stream9_arm"
+    mc01.vm.hostname = "mc01"
+    mc01.vm.network "private_network", ip: "192.168.56.24"
+    mc01.vm.provision "shell", path: "memcache.sh"  
+  end
+  
+### RabbitMQ vm  ####
+  config.vm.define "rmq01" do |rmq01|
+    rmq01.vm.box = "bandit145/centos_stream9_arm"
+  rmq01.vm.hostname = "rmq01"
+    rmq01.vm.network "private_network", ip: "192.168.56.23"
+    rmq01.vm.provision "shell", path: "rabbitmq.sh"  
+  end
+  
+### tomcat vm ###
+   config.vm.define "app01" do |app01|
+    app01.vm.box = "bandit145/centos_stream9_arm"
+    app01.vm.hostname = "app01"
+    app01.vm.network "private_network", ip: "192.168.56.22"
+    app01.vm.provision "shell", path: "tomcat.sh"  
+    app01.vm.provider "vmware_desktop" do |vb|
+     vb.memory = "1024"
+   end
+   end
+   
+  
+### Nginx VM ###
+  config.vm.define "web01" do |web01|
+    web01.vm.box = "spox/ubuntu-arm"
+    web01.vm.hostname = "web01"
+  web01.vm.network "private_network", ip: "192.168.56.21"
+  web01.vm.provision "shell", path: "nginx.sh"  
+end
+  
+end
